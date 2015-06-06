@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>canvas</title>
+<script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/fabric.js/1.5.0/fabric.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+
+<style type="text/css">
+  body {background-color: #000;}
+</style>
+
+<script type="text/javascript">
+var global_canvas;
+var timer = 0;
+var timer_end = 60;
+
+function get_query_arguments() {
+    var qs = (function(a) {
+      if (a == "") return {};
+      var b = {};
+      for (var i = 0; i < a.length; ++i)
+      {
+          var p=a[i].split('=', 2);
+          if (p.length == 1)
+              b[p[0]] = "";
+          else
+              b[p[0]] = decodeURIComponent(p[1].replace(/\+/g, " "));
+      }
+      return b;
+  })(window.location.search.substr(1).split('&'));
+  return qs;
+}
+
+function test() {
+  var query = get_query_arguments();
+  console.log(query);
+}
+
+function draw() {
+
+  var base_color = 'hsl(249, 75%, 0%)';
+
+  var minute_circle = new fabric.Circle({
+      radius: get_radius(),
+      angle: 0,
+      startAngle: 0,
+      endAngle: 0,
+      stroke: base_color,
+      strokeWidth: 25,
+      strokeLineCap: 'round',
+      strokeLineJoin: 'bevil',
+      fill: 'transparent'
+  });
+  var duration_circle = new fabric.Circle({
+    radius: get_radius()-35,
+    angle: 0,
+    startAngle: 0,
+    endAngle: 0,
+    stroke: base_color,
+    strokeWidth: 40,
+    strokeLineCap: 'round',
+    strokeLineJoin: 'bevil',
+    fill: 'transparent'
+  });
+
+  var minute_circle_groove = new fabric.Circle({
+      radius: get_radius(),
+      angle: 0,
+      stroke: 'white',
+      strokeWidth: 25,
+      strokeLineCap: 'round',
+      strokeLineJoin: 'bevil',
+      fill: 'transparent',
+      opacity: .2
+  });
+  var duration_circle_groove = new fabric.Circle({
+    radius: get_radius()-35,
+    angle: 0,
+    stroke: 'white',
+    strokeWidth: 40,
+    strokeLineCap: 'round',
+    strokeLineJoin: 'bevil',
+    fill: 'transparent',
+    opacity: .2
+  });
+
+  minute_circle.setGradient('stroke', {
+    x1: -minute_circle.width / 2,
+    y1: 0,
+    x2: minute_circle.width / 2,
+    y2: 0,
+    colorStops: {
+      0: "red",
+      1: "blue"
+    }
+  });
+  duration_circle.setGradient('stroke', {
+    x1: -duration_circle.width / 2,
+    y1: 0,
+    x2: duration_circle.width / 2,
+    y2: 0,
+    colorStops: {
+      0: "orange",
+      1: "purple"
+    }
+  });
+
+  minute_circle_groove.setGradient('stroke', {
+    x1: -minute_circle_groove.width / 2,
+    y1: 0,
+    x2: minute_circle_groove.width / 2,
+    y2: 0,
+    colorStops: {
+      0: "red",
+      1: "blue"
+    }
+  });
+  duration_circle_groove.setGradient('stroke', {
+    x1: -duration_circle_groove.width / 2,
+    y1: 0,
+    x2: duration_circle_groove.width / 2,
+    y2: 0,
+    colorStops: {
+      0: "orange",
+      1: "purple"
+    }
+  });
+
+  global_canvas.centerObject(minute_circle);
+  global_canvas.centerObject(duration_circle);
+
+  global_canvas.centerObject(minute_circle_groove);
+  global_canvas.centerObject(duration_circle_groove);
+
+  global_canvas.add(minute_circle);
+  global_canvas.add(duration_circle);
+
+  global_canvas.add(minute_circle_groove);
+  global_canvas.add(duration_circle_groove);
+
+  global_canvas.sendToBack(minute_circle_groove);
+  global_canvas.sendToBack(duration_circle_groove);
+
+  var twopi = (2*Math.PI);
+
+  global_canvas.renderAll();
+
+  minute_circle.animate('endAngle', twopi, {
+    easing: function(t, b, c, d) { return c*t/d + b; },
+    onChange: global_canvas.renderAll.bind(global_canvas),
+    duration: (1000 * 60)
+  });
+
+  duration_circle.animate('endAngle', twopi, {
+    easing: function(t, b, c, d) { return c*t/d + b; },
+    onChange: global_canvas.renderAll.bind(global_canvas),
+    duration: (1000 * 60 * 2)
+  });
+
+
+}
+
+function get_radius() {
+  var min = Math.min(window.innerWidth, window.innerHeight);
+  return Math.floor(min / 2) - 100;
+}
+
+function window_adapt() {
+  global_canvas.setWidth(window.innerWidth);
+  global_canvas.setHeight(window.innerHeight);
+  global_canvas.clear();
+}
+
+window.addEventListener('resize', function() {
+  window_adapt();
+  draw();
+  }, false);
+
+function start() {
+  global_canvas = new fabric.Canvas('canvas')
+  window_adapt();
+  draw();
+}
+
+window.onload = start;
+</script>
+
+</head>
+<body>
+
+  <canvas id="canvas" width="250" height="250"></canvas>
+
+</body>
+</html>
