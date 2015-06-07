@@ -37,9 +37,30 @@
 </style>
 
 <script type="text/javascript">
-var global_canvas;
-var timer = 0;
-var timer_end = 60;
+
+// objects
+var global_canvas = null;
+
+// flags
+var global_shutdown = false;
+var global_focused = true;
+
+var color_wheel = [
+  ['blue', 'orange'],
+  ['yellow', 'purple'],
+  ['green', 'red'],
+  ['red', 'blue'],
+  ['purple', 'orange']
+];
+
+function get_color_set(mag) {
+  var m = Math.max(1, mag);
+  var placevalue = Math.pow(10, m);
+  var placeholder = Math.pow(10, m-1);
+  var index = (Math.floor((state.end_time / placeholder)) % placevalue) % color_wheel.length;
+  var pair = color_wheel[index];
+  return pair;
+}
 
 var state = {
   duration_time: null, // minutes
@@ -64,6 +85,7 @@ function get_query_arguments() {
 }
 
 function linear_easing(t, b, c, d) { return c*t/d + b; }
+
 
 function draw() {
 
@@ -152,7 +174,6 @@ function draw() {
 
   global_canvas.centerObject(track_group);
 
-  console.log(track_circle.get('width'));
   track_indicator.set({
     top: track_circle.get('top'),
     left: 0
@@ -162,14 +183,17 @@ function draw() {
     left: 0
   });
 
+  var minute_colors = get_color_set(1); // 1-rightmost 123x
+  var duration_colors = get_color_set(2); // 2-rightmost 12x4
+
   minute_circle.setGradient('stroke', {
     x1: -minute_circle.width / 2,
     y1: 0,
     x2: minute_circle.width / 2,
     y2: 0,
     colorStops: {
-      0: "red",
-      1: "blue"
+      0: minute_colors[0],
+      1: minute_colors[1]
     }
   });
   duration_circle.setGradient('stroke', {
@@ -178,8 +202,8 @@ function draw() {
     x2: duration_circle.width / 2,
     y2: 0,
     colorStops: {
-      0: "purple",
-      1: "orange"
+      0: duration_colors[0],
+      1: duration_colors[1]
     }
   });
 
@@ -189,8 +213,8 @@ function draw() {
     x2: minute_circle_groove.width / 2,
     y2: 0,
     colorStops: {
-      0: "red",
-      1: "blue"
+      0: minute_colors[0],
+      1: minute_colors[1]
     }
   });
   duration_circle_groove.setGradient('stroke', {
@@ -199,8 +223,8 @@ function draw() {
     x2: duration_circle_groove.width / 2,
     y2: 0,
     colorStops: {
-      0: "orange",
-      1: "purple"
+      0: duration_colors[0],
+      1: duration_colors[1]
     }
   });
 
@@ -239,14 +263,15 @@ function draw() {
 
   global_canvas.renderAll();
 
-  var stop = false;
   var timeout = false;
+  var accepted = false;
 
   function text_tick() {
     var time = moment.duration(get_time_remaining());
     var string = time.humanize(true);
     text.set('text', 'done\n' + string);
     global_canvas.centerObject(text);
+    console.log('text_tick completed');
   }
 
   var minute_completed = get_minute_completed();
@@ -254,7 +279,7 @@ function draw() {
   minute_circle.set('endAngle', minute_completed * twopi);
 
   function minute_tick() {
-    if (stop) {return;}
+    if (global_shutdown) {return;}
     text_tick();
     minute_circle.animate('endAngle', twopi, {
       duration: (1000 * 59),
@@ -266,9 +291,10 @@ function draw() {
           easing: linear_easing,
           onChange: global_canvas.renderAll.bind(global_canvas),
           onComplete: function() {
+            console.log('minute_tick completed');
             minute_circle.set('opacity', 1);
             minute_circle.set('endAngle', 0);
-            if (stop == false) {
+            if (global_shutdown == false) {
               minute_tick();
             }
           }
@@ -281,10 +307,14 @@ function draw() {
 
   function track_timeout() {
     if (timeout == true) {
+      console.log('track_timeout completed');
       track_circle.set({'stroke': 'red', 'opacity': .2});
       track_indicator.set({'fill': 'red', 'opacity': .25});
       track_indicator_clone.set({'fill': 'red', 'opacity': .25});
-      minute_circle.set('flipY', true);
+      if (timeout == true && accepted == false) {
+        minute_circle.set('flipY', true);
+        accepted = true;
+      }
     }
   }
 
@@ -294,8 +324,9 @@ function draw() {
       onChange: global_canvas.renderAll.bind(global_canvas),
       easing: linear_easing,
       onComplete: function() {
+        console.log('track_tick completed');
         track_group.set('angle', 0);
-        if (stop == false) {
+        if (global_shutdown == false) {
           track_tick();
         }
       }
@@ -313,6 +344,7 @@ function draw() {
   duration_circle.set('endAngle', completed * twopi);
 
   duration_circle.animate('endAngle', twopi, {
+
     duration: (remaining),
     easing: linear_easing,
     onChange: global_canvas.renderAll.bind(global_canvas),
@@ -320,6 +352,7 @@ function draw() {
       timeout = true;
       track_timeout();
       text_tick();
+      console.log('duration_circle completed');
     }
   });
 
@@ -346,9 +379,10 @@ function window_adapt() {
 }
 
 window.addEventListener('resize', function() {
+  console.log('window sized changed; adjusting')
   window_adapt();
   draw();
-  }, false);
+}, false);
 
 function get_time_remaining() {
   var now = (new Date().getTime());
@@ -361,7 +395,6 @@ function get_duration_completed() {
   var end = (state.end_time);
 
   var d = 1 - ((end - now)/(state.duration * 60 * 1000))
-
 
   var completed = d;
 
@@ -380,6 +413,35 @@ function clock_initialization(query) {
   state.end_time = parseInt(query.e);
 }
 
+function environment_initialization() {
+
+  function shutdown() {
+    var svg = global_canvas.toSVG();
+    global_canvas.dispose();
+    $('#container').html(svg);
+    global_shutdown = true;
+  }
+
+  function abort() {
+    var previous = global_focused;
+    var focused = document.hasFocus();
+
+    if (previous == false && focused == true) {
+      location.reload();
+    }
+
+    if ( global_shutdown == false && focused == false ) {
+      console.log('window was idle; shutting down - please refresh');
+      shutdown();
+    }
+
+    global_focused = focused;
+    console.log('window focused = %o', focused);
+  }
+
+  setInterval(abort, 5000);
+}
+
 function start() {
 
   global_canvas = new fabric.Canvas('canvas');
@@ -388,15 +450,14 @@ function start() {
 
   if (query.e && query.d) {
       console.log('query arguments set: %o', query);
+      environment_initialization();
       clock_initialization(query);
       window_adapt();
       draw();
   }
 
   $('#save').on('click', function(event){
-    console.log(event);
     var duration = $('#duration').val();
-    console.log(duration);
     var hash = 'd=' + duration + '&e=' + (new Date().getTime() + (duration * 60 * 1000));
     window.location.hash = hash;
     location.reload();
@@ -422,8 +483,9 @@ window.onload = start;
     </div>
   </div>
 
-
+  <div id="container">
     <canvas id="canvas" width="250" height="250"></canvas>
+  </div>
 
 </body>
 </html>
