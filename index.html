@@ -3,17 +3,48 @@
 <head>
 <meta charset="utf-8">
 <title>canvas</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=yes" />
+
+<script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/moment.js/2.10.3/moment.min.js"></script>
 <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/fabric.js/1.5.0/fabric.js"></script>
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+<script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
 
 <style type="text/css">
-  body {background-color: #000;}
+  body {background-color: #000; overflow: hidden; font-family: sans-serif;}
+  #control-panel {
+    color: #fff;
+    background-color: #000;
+    position: absolute;
+    z-index: 1000;
+  }
+  #control-panel:hover {
+    background-color: #fff;
+    color: #000;
+    transition: background-color .5s, color .5s;
+  }
+  #handle {
+    padding: 1em 1em 1em 1em;
+    margin: 0em;
+  }
+  .inner {
+    padding: 1em;
+    margin: 1em;
+    display: none;
+  }
+  #control-panel:hover .inner {
+    display: block;
+  }
 </style>
 
 <script type="text/javascript">
 var global_canvas;
 var timer = 0;
 var timer_end = 60;
+
+var state = {
+  duration_time: null, // minutes
+  end_time: null, // date epoch
+};
 
 function get_query_arguments() {
     var qs = (function(a) {
@@ -28,44 +59,42 @@ function get_query_arguments() {
               b[p[0]] = decodeURIComponent(p[1].replace(/\+/g, " "));
       }
       return b;
-  })(window.location.search.substr(1).split('&'));
+  })(window.location.hash.substr(1).split('&'));
   return qs;
 }
 
-function test() {
-  var query = get_query_arguments();
-  console.log(query);
-}
+function linear_easing(t, b, c, d) { return c*t/d + b; }
 
 function draw() {
 
-  var base_color = 'hsl(249, 75%, 0%)';
+  var base_color = '#000';
+  var base_radius = get_radius();
 
   var minute_circle = new fabric.Circle({
-      radius: get_radius(),
-      angle: 0,
+      radius: base_radius,
+      angle: -90,
       startAngle: 0,
-      endAngle: 0,
+      endAngle: .01,
       stroke: base_color,
       strokeWidth: 25,
       strokeLineCap: 'round',
       strokeLineJoin: 'bevil',
-      fill: 'transparent'
+      fill: 'transparent',
   });
   var duration_circle = new fabric.Circle({
-    radius: get_radius()-35,
-    angle: 0,
-    startAngle: 0,
-    endAngle: 0,
-    stroke: base_color,
-    strokeWidth: 40,
-    strokeLineCap: 'round',
-    strokeLineJoin: 'bevil',
-    fill: 'transparent'
+      radius: base_radius-35,
+      angle: -90,
+      startAngle: 0,
+      endAngle: .05,
+      stroke: base_color,
+      strokeWidth: 40,
+      strokeLineCap: 'round',
+      strokeLineJoin: 'bevil',
+      fill: 'rgba(0,0,0,0)'
   });
 
   var minute_circle_groove = new fabric.Circle({
-      radius: get_radius(),
+      radius: base_radius,
       angle: 0,
       stroke: 'white',
       strokeWidth: 25,
@@ -75,14 +104,62 @@ function draw() {
       opacity: .2
   });
   var duration_circle_groove = new fabric.Circle({
-    radius: get_radius()-35,
+      radius: base_radius-35,
+      angle: 0,
+      stroke: 'white',
+      strokeWidth: 40,
+      strokeLineCap: 'round',
+      strokeLineJoin: 'bevil',
+      fill: 'transparent',
+      opacity: .2
+  });
+
+  var track_circle = new fabric.Circle({
+    radius: base_radius+30,
     angle: 0,
     stroke: 'white',
-    strokeWidth: 40,
-    strokeLineCap: 'round',
-    strokeLineJoin: 'bevil',
+    strokeWidth: 1,
+    strokeLineCap: 'square',
     fill: 'transparent',
-    opacity: .2
+    opacity: .1
+  });
+
+  var track_indicator = new fabric.Circle({
+    radius: 5,
+    angle: 0,
+    stroke: '#999',
+    strokeWidth: 1,
+    strokeLineCap: 'square',
+    fill: 'white',
+    opacity: .15,
+    top: 100,
+    left: 100,
+    originX: 'center',
+    originY: 'center',
+  });
+
+  var track_indicator_clone = track_indicator.clone();
+  track_indicator_clone.set({
+    top: 100,
+    left: 100
+  });
+
+  var track_group = new fabric.Group([ track_circle, track_indicator, track_indicator_clone ], {
+    angle: 0,
+    originX: 'center',
+    originY: 'center',
+  });
+
+  global_canvas.centerObject(track_group);
+
+  console.log(track_circle.get('width'));
+  track_indicator.set({
+    top: track_circle.get('top'),
+    left: 0
+  });
+  track_indicator_clone.set({
+    top: track_circle.get('height') + track_circle.get('top'),
+    left: 0
   });
 
   minute_circle.setGradient('stroke', {
@@ -101,8 +178,8 @@ function draw() {
     x2: duration_circle.width / 2,
     y2: 0,
     colorStops: {
-      0: "orange",
-      1: "purple"
+      0: "purple",
+      1: "orange"
     }
   });
 
@@ -127,6 +204,19 @@ function draw() {
     }
   });
 
+  var text = new fabric.Text('...', {
+      left: 100,
+      top: 100,
+      fill: 'white',
+      textAlign: 'center',
+      fontFamily: 'sans-serif',
+      fontSize: '32'
+    });
+
+  global_canvas.centerObject(text);
+  global_canvas.add(text);
+  global_canvas.bringToFront(text);
+
   global_canvas.centerObject(minute_circle);
   global_canvas.centerObject(duration_circle);
 
@@ -142,28 +232,111 @@ function draw() {
   global_canvas.sendToBack(minute_circle_groove);
   global_canvas.sendToBack(duration_circle_groove);
 
+  global_canvas.centerObject(track_group);
+  global_canvas.add(track_group);
+
   var twopi = (2*Math.PI);
 
   global_canvas.renderAll();
 
-  minute_circle.animate('endAngle', twopi, {
-    easing: function(t, b, c, d) { return c*t/d + b; },
-    onChange: global_canvas.renderAll.bind(global_canvas),
-    duration: (1000 * 60)
-  });
+  var stop = false;
+  var timeout = false;
+
+  function text_tick() {
+    var time = moment.duration(get_time_remaining());
+    var string = time.humanize(true);
+    text.set('text', 'done\n' + string);
+    global_canvas.centerObject(text);
+  }
+
+  var minute_completed = get_minute_completed();
+
+  minute_circle.set('endAngle', minute_completed * twopi);
+
+  function minute_tick() {
+    if (stop) {return;}
+    text_tick();
+    minute_circle.animate('endAngle', twopi, {
+      duration: (1000 * 59),
+      easing: linear_easing,
+      onChange: global_canvas.renderAll.bind(global_canvas),
+      onComplete: function() {
+        minute_circle.animate('opacity', 0, {
+          duration: 1000,
+          easing: linear_easing,
+          onChange: global_canvas.renderAll.bind(global_canvas),
+          onComplete: function() {
+            minute_circle.set('opacity', 1);
+            minute_circle.set('endAngle', 0);
+            if (stop == false) {
+              minute_tick();
+            }
+          }
+        });
+      }
+    });
+  }
+
+  minute_tick();
+
+  function track_timeout() {
+    if (timeout == true) {
+      track_circle.set({'stroke': 'red', 'opacity': .2});
+      track_indicator.set({'fill': 'red', 'opacity': .25});
+      track_indicator_clone.set({'fill': 'red', 'opacity': .25});
+      minute_circle.set('flipY', true);
+    }
+  }
+
+  function track_tick() {
+    track_group.animate('angle', 360, {
+      duration: 2000,
+      onChange: global_canvas.renderAll.bind(global_canvas),
+      easing: linear_easing,
+      onComplete: function() {
+        track_group.set('angle', 0);
+        if (stop == false) {
+          track_tick();
+        }
+      }
+    });
+  }
+
+  track_tick();
+
+  var remaining = get_time_remaining();
+
+  text_tick();
+
+  var completed = get_duration_completed();
+
+  duration_circle.set('endAngle', completed * twopi);
 
   duration_circle.animate('endAngle', twopi, {
-    easing: function(t, b, c, d) { return c*t/d + b; },
+    duration: (remaining),
+    easing: linear_easing,
     onChange: global_canvas.renderAll.bind(global_canvas),
-    duration: (1000 * 60 * 2)
+    onComplete: function() {
+      timeout = true;
+      track_timeout();
+      text_tick();
+    }
   });
 
+  global_canvas.selection = false;
+  global_canvas.forEachObject(function(o) {
+      o.selectable = false;
+  });
 
 }
 
 function get_radius() {
   var min = Math.min(window.innerWidth, window.innerHeight);
-  return Math.floor(min / 2) - 100;
+  var value = Math.floor(min / 2.718) - 60;
+  var lowest = 200;
+  var radius = Math.max(value, lowest);
+  console.log('radius calculated: %o; based on min w/h = %o | scaled = %o | lowest = %o', radius, min, value, lowest);
+  return radius;
 }
 
 function window_adapt() {
@@ -177,10 +350,58 @@ window.addEventListener('resize', function() {
   draw();
   }, false);
 
+function get_time_remaining() {
+  var now = (new Date().getTime());
+  var diff = state.end_time - now;
+  return diff;
+}
+
+function get_duration_completed() {
+  var now = (new Date().getTime());
+  var end = (state.end_time);
+
+  var d = 1 - ((end - now)/(state.duration * 60 * 1000))
+
+
+  var completed = d;
+
+  console.log("duration completed = %o%; based on %o | %o", Math.round(100 * completed), now, state.end_time);
+  return completed;
+}
+
+function get_minute_completed() {
+  var now = Math.floor((new Date().getTime()) / 1000);
+  var mod = now % 100; // gets rightmost two digits
+  return mod / 100;
+}
+
+function clock_initialization(query) {
+  state.duration = parseInt(query.d);
+  state.end_time = parseInt(query.e);
+}
+
 function start() {
-  global_canvas = new fabric.Canvas('canvas')
-  window_adapt();
-  draw();
+
+  global_canvas = new fabric.Canvas('canvas');
+
+  var query = get_query_arguments();
+
+  if (query.e && query.d) {
+      console.log('query arguments set: %o', query);
+      clock_initialization(query);
+      window_adapt();
+      draw();
+  }
+
+  $('#save').on('click', function(event){
+    console.log(event);
+    var duration = $('#duration').val();
+    console.log(duration);
+    var hash = 'd=' + duration + '&e=' + (new Date().getTime() + (duration * 60 * 1000));
+    window.location.hash = hash;
+    location.reload();
+  });
+
 }
 
 window.onload = start;
@@ -189,7 +410,20 @@ window.onload = start;
 </head>
 <body>
 
-  <canvas id="canvas" width="250" height="250"></canvas>
+
+  <div id="control-panel">
+    <h4 id="handle">Control Panel</h4>
+    <div class="inner">
+      <fieldset>
+        <label>Duration: </lanel>
+        <input type="number" id="duration" value="60" />
+        <input type="button" id="save" value="Save" />
+      </fieldset>
+    </div>
+  </div>
+
+
+    <canvas id="canvas" width="250" height="250"></canvas>
 
 </body>
 </html>
