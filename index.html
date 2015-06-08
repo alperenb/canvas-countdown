@@ -34,6 +34,21 @@
   #control-panel:hover .inner {
     display: block;
   }
+  #control-panel label {
+    display: block;
+  }
+  #control-panel input {
+    display: block;
+  }
+
+  #control-panel.very-visible {
+    color: #000;
+    background-color: #fff;
+  }
+  #control-panel.very-visible .inner {
+    display: block;
+  }
+
 </style>
 
 <script type="text/javascript">
@@ -413,7 +428,7 @@ function clock_initialization(query) {
   state.end_time = parseInt(query.e);
 }
 
-function environment_initialization() {
+function shutdown_initialization(delay) {
 
   function shutdown() {
     var svg = global_canvas.toSVG();
@@ -439,7 +454,7 @@ function environment_initialization() {
     console.log('window focused = %o', focused);
   }
 
-  setInterval(abort, 5000);
+  setInterval(abort, delay);
 }
 
 function start() {
@@ -450,15 +465,30 @@ function start() {
 
   if (query.e && query.d) {
       console.log('query arguments set: %o', query);
-      environment_initialization();
+
+      if (query.s && query.s == '0') {
+        console.log('shutdown to svg disabled');
+      } else if (query.s) {
+        var _customized = parseFloat(query.s) * 60 * 1000;
+        shutdown_initialization(_customized);
+        console.log('shutdown to svg enabled at customized timeout: %o', _customized)
+      } else {
+        var _default = 2 * 60 * 1000;
+        console.log('shutdown to svg enabled at default timeout: %o', _default);
+        shutdown_initialization(_default);
+      }
+
       clock_initialization(query);
       window_adapt();
       draw();
+  } else {
+    $('#control-panel').addClass('very-visible');
   }
 
   $('#save').on('click', function(event){
     var duration = $('#duration').val();
-    var hash = 'd=' + duration + '&e=' + (new Date().getTime() + (duration * 60 * 1000));
+    var timeout = $('#timeout').val();
+    var hash = 'd=' + duration + '&e=' + (new Date().getTime() + (duration * 60 * 1000)) + '&s=' + timeout;
     window.location.hash = hash;
     location.reload();
   });
@@ -476,8 +506,10 @@ window.onload = start;
     <h4 id="handle">Control Panel</h4>
     <div class="inner">
       <fieldset>
-        <label>Duration: </lanel>
-        <input type="number" id="duration" value="60" />
+        <label>Duration: </label>
+        <input type="number" id="duration" value="60" placeholder="minutes" />
+        <label>Idle Timout: </label>
+        <input type="number" id="timeout" value="0" placeholder="minutes (or 0 for never)" />
         <input type="button" id="save" value="Save" />
       </fieldset>
     </div>
