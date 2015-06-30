@@ -284,7 +284,9 @@ function draw() {
   function text_tick() {
     var time = moment.duration(get_time_remaining());
     var string = time.humanize(true);
-    text.set('text', 'done\n' + string);
+    var output = 'done\n' + string;
+    text.set('text', output);
+    document.title = output + ' - canvas countdown';
     global_canvas.centerObject(text);
     console.log('text_tick completed');
   }
@@ -459,7 +461,7 @@ function shutdown_initialization(delay) {
 
 function start() {
 
-  global_canvas = new fabric.Canvas('canvas');
+  global_canvas = new fabric.StaticCanvas('canvas');
 
   var query = get_query_arguments();
 
